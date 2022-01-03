@@ -2,9 +2,9 @@ use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::error::{ParseError, VerboseError};
 use nom::multi::many0;
-use nom::sequence::{tuple};
-use nom::{Parser, Slice};
+use nom::sequence::tuple;
 use nom::{bytes::complete::tag, combinator::opt, multi::separated_list0, IResult};
+use nom::{Parser, Slice};
 use nom_locate::position;
 
 use crate::data::*;
@@ -17,7 +17,7 @@ pub fn module(input: Span) -> ParserResult<Module> {
 
 	let mut input = input;
 
-	loop{
+	loop {
 		let action_result = action(input);
 		let fail_action = action_result.is_err();
 		if let Ok((rest_input, action)) = action_result {
@@ -35,26 +35,19 @@ pub fn module(input: Span) -> ParserResult<Module> {
 		}
 	}
 
-	let imports = actions
-	.iter()
-	.filter_map(|elem| {
-		if let Action::ImportStmt(import) = elem {
-			Some(import.clone())
-		} else {
-			None
-		}
-	})
-	.collect();
+	let imports =
+		actions
+			.iter()
+			.filter_map(|elem| {
+				if let Action::ImportStmt(import) = elem {
+					Some(import.clone())
+				} else {
+					None
+				}
+			})
+			.collect();
 
-
-	Ok((
-		input,
-		Module {
-			actions,
-			classes,
-			imports
-		},
-	))
+	Ok((input, Module { actions, classes, imports }))
 }
 
 pub fn action(input: Span) -> ParserResult<Action> {
@@ -86,13 +79,18 @@ pub fn class(input: Span) -> ParserResult<Class> {
 	let (input, class_specifier) = tag("class")(input)?;
 	let (input, _) = multispace1(input)?;
 	let (input, name) = alphanumeric1(input)?;
-	let (input, is_superclass) = opt(tuple((multispace1, tag("is"), multispace1, alphanumeric1, multispace0)))(input)?;
-	Ok((input, Class{ 
-		attributes, 
-		name: name.into(),
-		class_keyword: class_specifier.into(), 
-		superclass: is_superclass.map(|is_soup| is_soup.3.into()), 
-		methods: Vec::new()}))
+	let (input, is_superclass) =
+		opt(tuple((multispace1, tag("is"), multispace1, alphanumeric1, multispace0)))(input)?;
+	Ok((
+		input,
+		Class {
+			attributes,
+			name: name.into(),
+			class_keyword: class_specifier.into(),
+			superclass: is_superclass.map(|is_soup| is_soup.3.into()),
+			methods: Vec::new(),
+		},
+	))
 }
 
 pub fn attribute(input: Span) -> ParserResult<Attribute> {
@@ -106,11 +104,15 @@ pub fn attribute(input: Span) -> ParserResult<Attribute> {
 	let (input, attribute) = attribute_value(input)?; //todo: parse subattributes
 	let (input, _) = multispace0(input)?;
 
-	Ok((input, Attribute{
-		name: key.into(), 
-		tag: tag_char.into(), 
-		runtime_specifier: runtime_specifier.map(|s|s.into()), 
-		value: AttributeValue::Expr(attribute)}))
+	Ok((
+		input,
+		Attribute {
+			name: key.into(),
+			tag: tag_char.into(),
+			runtime_specifier: runtime_specifier.map(|s| s.into()),
+			value: AttributeValue::Expr(attribute),
+		},
+	))
 }
 
 pub fn attribute_value(input: Span) -> ParserResult<Expr> {
@@ -131,9 +133,7 @@ pub fn import_variable(input: Span) -> ParserResult<ImportVar> {
 	Ok((input, ImportVar { name, as_keyword, source }))
 }
 
-pub fn as_expr<'a, I, O, E: ParseError<I>, F>(
-	first: F,
-) -> impl FnMut(I) -> IResult<I, Expr<'a>, E>
+pub fn as_expr<'a, I, O, E: ParseError<I>, F>(first: F) -> impl FnMut(I) -> IResult<I, Expr<'a>, E>
 where
 	F: Parser<I, O, E>,
 	O: std::convert::Into<Expr<'a>>,
@@ -151,9 +151,7 @@ where
 	as_other::<_, _, Action, _, _>(first)
 }
 
-pub fn as_stmt<'a, I, O, E: ParseError<I>, F>(
-	first: F,
-) -> impl FnMut(I) -> IResult<I, Stmt<'a>, E>
+pub fn as_stmt<'a, I, O, E: ParseError<I>, F>(first: F) -> impl FnMut(I) -> IResult<I, Stmt<'a>, E>
 where
 	F: Parser<I, O, E>,
 	O: std::convert::Into<Stmt<'a>>,
@@ -161,9 +159,7 @@ where
 	as_other::<_, _, Stmt, _, _>(first)
 }
 
-fn as_other<I, O, T, E: ParseError<I>, F>(
-	mut first: F,
-) -> impl FnMut(I) -> IResult<I, T, E>
+fn as_other<I, O, T, E: ParseError<I>, F>(mut first: F) -> impl FnMut(I) -> IResult<I, T, E>
 where
 	F: Parser<I, O, E>,
 	O: std::convert::Into<T>,

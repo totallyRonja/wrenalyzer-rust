@@ -1,6 +1,6 @@
 use proc_macro::{self, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data};
+use syn::{parse_macro_input, Data, DeriveInput};
 
 #[proc_macro_derive(FlatDebug)]
 pub fn flatdebug_derive(input: TokenStream) -> TokenStream {
@@ -8,10 +8,14 @@ pub fn flatdebug_derive(input: TokenStream) -> TokenStream {
 	if let Data::Enum(enum_data) = ast.data {
 		let ident = ast.ident;
 
-		let variants: Vec<proc_macro2::TokenStream> = enum_data.variants.iter().map(|v|{
+		let variants: Vec<proc_macro2::TokenStream> = enum_data
+			.variants
+			.iter()
+			.map(|v| {
 				let variant = &v.ident;
-				quote!{ Self::#variant(data) => data.fmt(f), }
-		}).collect();
+				quote! { Self::#variant(data) => data.fmt(f), }
+			})
+			.collect();
 
 		let output = quote! {
 			impl std::fmt::Debug for #ident<'_> {
@@ -22,7 +26,7 @@ pub fn flatdebug_derive(input: TokenStream) -> TokenStream {
 				}
 			}
 		};
-		
+
 		return output.into();
 	}
 	TokenStream::new()
