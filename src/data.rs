@@ -67,11 +67,8 @@ pub struct ImportStmt<'a> {
 impl std::fmt::Debug for ImportStmt<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 			write!(f, "{}", self.import_token.text())?;
-			write!(f, " ")?;
-			write!(f, "\"{}\"", self.path.text())?;
-			write!(f, " ")?;
+			write!(f, "{}", self.path.text())?;
 			write!(f, "{}", self.for_token.text())?;
-			write!(f, " ")?;
 			f.debug_list().entries(self.variables.iter()).finish()
 	}
 }

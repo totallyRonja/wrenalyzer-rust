@@ -3,7 +3,7 @@ use nom::character::complete::*;
 use nom::error::{ParseError, VerboseError};
 use nom::multi::many0;
 use nom::sequence::{delimited, tuple};
-use nom::Parser;
+use nom::{Parser, Slice};
 use nom::{bytes::complete::tag, combinator::opt, multi::separated_list0, IResult};
 use nom_locate::position;
 
@@ -62,17 +62,21 @@ pub fn action(input: Span) -> ParserResult<Action> {
 }
 
 pub fn import(input: Span) -> ParserResult<ImportStmt> {
+	let (input, before) = multispace0(input)?;
 	let (input, import) = tag("import")(input)?;
-	let (input, _) = multispace0(input)?;
+	let import = Token::new_w_before(before, import);
+	let (input, before_path) = multispace0(input)?;
 	let (input, path) = quote_string(input)?;
-	let (input, _) = multispace0(input)?;
+	let (input, after_path) = multispace0(input)?;
+	let path_token = Token::new(before_path, path, after_path);
 	let (input, for_token) = tag("for")(input)?;
-	let (input, _) = multispace1(input)?;
+	let (input, after_for) = multispace1(input)?;
+	let for_token = Token::new_w_after(for_token, after_for);
 	let (input, variables) =
 		separated_list0(tuple((multispace0, tag(","), multispace0)), import_variable)(input)?;
 	let (input, _) = whitespace0(input)?;
 	let (input, _) = line_ending_or_eof(input)?;
-	Ok((input, ImportStmt { import_token: import.into(), path: path.into(), for_token: for_token.into(), variables }))
+	Ok((input, ImportStmt { import_token: import, path: path_token, for_token, variables }))
 }
 
 pub fn class(input: Span) -> ParserResult<Class> {
@@ -122,7 +126,7 @@ pub fn import_variable(input: Span) -> ParserResult<ImportVar> {
 	))(input)?;
 	let name: Token = var_tokens.1.into();
 	let source_as = var_tokens.0;
-	let as_keyword = source_as.map(|as_kw| as_kw.2.into());
+	let as_keyword = source_as.map(|as_kw| Token::new(as_kw.1, as_kw.2, as_kw.3));
 	let source = source_as.map_or(name.clone(), |as_kw| as_kw.0.into());
 	Ok((input, ImportVar { name, as_keyword, source }))
 }
@@ -179,11 +183,15 @@ pub fn string_expr(input: Span) -> ParserResult<StringExpr> {
 
 //todo: support string interpolation and multiline strings
 pub fn quote_string(input: Span) -> ParserResult<Span> {
-	let (input, string) =
-		delimited(char('"'), escaped(is_not("\""), '\\', one_of("\\\"")), char('"'))(input)?;
+	let original_input = input;
+	let (input, _) = char('"')(input)?;
+	let (input, string) = escaped(is_not("\""), '\\', one_of("\\\""))(input)?;
+	let (input, _) = char('"')(input)?;
+	let string = original_input.slice(..(string.len() + 2));
 	Ok((input, string))
 }
 
+//todo: parse comments as whitespace
 //similar to multispace0, but doesnt eat newlines
 pub fn whitespace0(input: Span) -> ParserResult<Span> {
 	take_while(|c: char| c == ' ' || c == '\t')(input)
