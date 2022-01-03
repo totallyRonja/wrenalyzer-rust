@@ -1,3 +1,4 @@
+use nom::branch::alt;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::error::{ParseError, VerboseError};
@@ -51,7 +52,7 @@ pub fn module(input: Span) -> ParserResult<Module> {
 }
 
 pub fn action(input: Span) -> ParserResult<Action> {
-	as_action(import)(input)
+	alt((as_action(import), as_action(number)))(input)
 }
 
 pub fn import(input: Span) -> ParserResult<ImportStmt> {
@@ -70,6 +71,25 @@ pub fn import(input: Span) -> ParserResult<ImportStmt> {
 	let (input, _) = whitespace0(input)?;
 	let (input, _) = line_ending_or_eof(input)?;
 	Ok((input, ImportStmt { import_token: import, path: path_token, for_token, variables }))
+}
+
+pub fn number(input: Span) -> ParserResult<NumExpr> {
+	let (input, before) = multispace0(input)?;
+	let (input, prefix) = opt(tag("0x"))(input)?;
+	let input_before_num = input;
+	let (input, mut number) = digit1(input)?;
+	let (input, fractional) = opt(tuple((char('.'), digit1)))(input)?;
+	let (input, after) = whitespace0(input)?;
+	let prefix = prefix.map(|p| Token::new_w_before(before, p));
+	if let Some(frac) = fractional {
+		number = input_before_num.slice(..(number.len() + 1 + frac.1.len()))
+	}
+	let number = if prefix.is_some() {
+		Token::new_w_after(number, after)
+	} else {
+		Token::new(before, number, after)
+	};
+	Ok((input, NumExpr { prefix, number }))
 }
 
 pub fn class(input: Span) -> ParserResult<Class> {

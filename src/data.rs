@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug};
 
 use derive_more::From;
 use flatdebug::FlatDebug;
@@ -16,6 +16,7 @@ pub struct ModuleElement<'a> {
 pub enum Action<'a> {
 	ImportStmt(ImportStmt<'a>),
 	StringExpr(StringExpr<'a>),
+	NumExpr(NumExpr<'a>),
 }
 
 #[derive(Debug, Clone, From)]
@@ -26,6 +27,7 @@ pub enum Stmt<'a> {
 #[derive(FlatDebug, Clone, From)]
 pub enum Expr<'a> {
 	StringExpr(StringExpr<'a>),
+	NumExpr(NumExpr<'a>),
 }
 
 #[derive(Debug, Clone)]
@@ -64,10 +66,7 @@ pub struct ImportStmt<'a> {
 
 impl std::fmt::Debug for ImportStmt<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.import_token.text())?;
-		write!(f, "{}", self.path.text())?;
-		write!(f, "{}", self.for_token.text())?;
-		f.debug_list().entries(self.variables.iter()).finish()
+		write!(f, "{} {} {} {:?}", self.import_token.text(), self.path.text(), self.for_token.text(), self.variables)
 	}
 }
 
@@ -78,7 +77,22 @@ pub struct StringExpr<'a> {
 
 impl std::fmt::Debug for StringExpr<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "\"{}\"", self.string.text())
+		write!(f, "{}", self.string.text())
+	}
+}
+
+#[derive(Clone)]
+pub struct NumExpr<'a> {
+	pub prefix: Option<Token<'a>>,
+	pub number: Token<'a>,
+}
+
+impl std::fmt::Debug for NumExpr<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		if let Some(prefix) = &self.prefix {
+			write!(f, "{}", prefix.text())?;
+		}
+		write!(f, "{}", self.number.text())
 	}
 }
 
@@ -113,7 +127,7 @@ impl std::fmt::Debug for ImportVar<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.source.text())?;
 		if let Some(as_kw) = &self.as_keyword {
-			write!(f, "{}", as_kw.text())?;
+			write!(f, " {} ", as_kw.text())?;
 			write!(f, "{}", self.name.text())?;
 		}
 		Ok(())
@@ -144,7 +158,7 @@ impl<'a> Token<'a> {
 		Token { core: span, before: Some(before.fragment()), after: Some(after.fragment()) }
 	}
 
-	pub fn text(&self) -> String {
+	pub fn all_text(&self) -> String {
 		let mut text = String::new();
 		if let Some(before) = self.before {
 			text.push_str(before);
@@ -154,6 +168,10 @@ impl<'a> Token<'a> {
 			text.push_str(after);
 		}
 		text
+	}
+
+	pub fn text(&self) -> &str {
+		self.core.fragment()
 	}
 }
 
