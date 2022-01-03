@@ -52,7 +52,11 @@ pub fn module(input: Span) -> ParserResult<Module> {
 }
 
 pub fn action(input: Span) -> ParserResult<Action> {
-	alt((as_action(import), as_action(number)))(input)
+	alt((as_action(import), as_action(number), as_action(string_expr)))(input)
+}
+
+pub fn expr(input: Span) -> ParserResult<Expr> {
+	alt((as_expr(number), as_expr(string_expr)))(input)
 }
 
 pub fn import(input: Span) -> ParserResult<ImportStmt> {
@@ -138,7 +142,7 @@ pub fn attribute(input: Span) -> ParserResult<Attribute> {
 pub fn attribute_value(input: Span) -> ParserResult<Expr> {
 	let (input, _) = char('=')(input)?;
 	let (input, _) = multispace0(input)?;
-	as_expr(string_expr)(input)
+	expr(input)
 }
 
 pub fn import_variable(input: Span) -> ParserResult<ImportVar> {
@@ -192,8 +196,10 @@ where
 }
 
 pub fn string_expr(input: Span) -> ParserResult<StringExpr> {
+	let (input, before) = multispace0(input)?;
 	let (input, string) = quote_string(input)?;
-	let expr = StringExpr { string: string.into() };
+	let (input, after) = whitespace0(input)?;
+	let expr = StringExpr { string: Token::new(before, string, after) };
 	Ok((input, expr))
 }
 
