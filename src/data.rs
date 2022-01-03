@@ -115,9 +115,7 @@ impl std::fmt::Debug for ImportVar<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 			write!(f, "{}", self.source.text())?;
 			if let Some(as_kw) = &self.as_keyword {
-				write!(f, " ")?;
 				write!(f, "{}", as_kw.text())?;
-				write!(f, " ")?;
 				write!(f, "{}", self.name.text())?;
 			}
 			Ok(())

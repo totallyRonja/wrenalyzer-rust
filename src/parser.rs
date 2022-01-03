@@ -2,7 +2,7 @@ use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::error::{ParseError, VerboseError};
 use nom::multi::many0;
-use nom::sequence::{delimited, tuple};
+use nom::sequence::{tuple};
 use nom::{Parser, Slice};
 use nom::{bytes::complete::tag, combinator::opt, multi::separated_list0, IResult};
 use nom_locate::position;
