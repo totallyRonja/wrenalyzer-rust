@@ -3,7 +3,7 @@ use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::error::{ParseError, VerboseError};
 use nom::multi::many0;
-use nom::sequence::tuple;
+use nom::sequence::{tuple, delimited};
 use nom::{bytes::complete::tag, combinator::opt, multi::separated_list0, IResult};
 use nom::{Parser, Slice};
 use nom_locate::position;
@@ -14,7 +14,7 @@ pub type ParserResult<'a, Out> = IResult<Span<'a>, Out, VerboseError<Span<'a>>>;
 
 pub fn module(input: Span) -> ParserResult<Module> {
 	let mut actions = Vec::new();
-	let mut classes = Vec::new();
+	let mut classes:Vec<Class> = Vec::new();
 
 	let mut input = input;
 
@@ -27,9 +27,12 @@ pub fn module(input: Span) -> ParserResult<Module> {
 		}
 		let class_result = class(input);
 		let fail_class = class_result.is_err();
-		if let Ok((rest_input, class)) = class_result {
-			input = rest_input;
-			classes.push(class);
+		if let Ok((rest_input, class)) = &class_result {
+			input = rest_input.to_owned();
+			classes.push(class.to_owned());
+		}
+		if let Err(err) = &class_result {
+			println!("{:#?}", err);
 		}
 		if fail_action && fail_class {
 			break;
@@ -97,7 +100,6 @@ pub fn number(input: Span) -> ParserResult<NumExpr> {
 }
 
 pub fn class(input: Span) -> ParserResult<Class> {
-	let (input, _) = multispace0(input)?;
 	let (input, attributes) = many0(attribute)(input)?;
 	let (input, _) = multispace0(input)?;
 	let (input, class_specifier) = tag("class")(input)?;
@@ -105,6 +107,8 @@ pub fn class(input: Span) -> ParserResult<Class> {
 	let (input, name) = alphanumeric1(input)?;
 	let (input, is_superclass) =
 		opt(tuple((multispace1, tag("is"), multispace1, alphanumeric1, multispace0)))(input)?;
+	let (input, _) = multispace0(input)?;
+	let (input, body) = class_body(input)?;
 	Ok((
 		input,
 		Class {
@@ -112,21 +116,96 @@ pub fn class(input: Span) -> ParserResult<Class> {
 			name: name.into(),
 			class_keyword: class_specifier.into(),
 			superclass: is_superclass.map(|is_soup| is_soup.3.into()),
-			methods: Vec::new(),
+			body,
 		},
 	))
 }
 
+pub fn class_body(input: Span) -> ParserResult<ClassBody> {
+	let (input, open_bracket) = tag("{")(input)?;
+	let (input, after_open) = whitespace0(input)?;
+	let open_bracket = Token::new_w_after(open_bracket, after_open);
+	let (input, methods) = many0(method)(input)?;
+	let (input, before_end) = multispace0(input)?;
+	let (input, close_bracket) = tag("}")(input)?;
+	let (input, after_end) = whitespace0(input)?;
+	let close_bracket = Token::new(before_end, close_bracket, after_end);
+
+	Ok((input, ClassBody{opening_bracket: open_bracket, methods, closing_bracket: close_bracket}))
+}
+
+pub fn method(input: Span) -> ParserResult<Method> {
+	let (input, attributes) = many0(attribute)(input)?;
+
+	let (input, construct) = opt(tuple((multispace0, tag("construct"), multispace1)))(input)?;
+	let construct = construct.map(|t|Token::new(t.0, t.1, t.2));
+
+	let (input, static_keyword) = opt(tuple((multispace0, tag("static"), multispace1)))(input)?;
+	let static_keyword = static_keyword.map(|t|Token::new(t.0, t.1, t.2));
+
+	let (input, foreign) = opt(tuple((multispace0, tag("foreign"), multispace1)))(input)?; //order?
+	let foreign = foreign.map(|t|Token::new(t.0, t.1, t.2));
+	
+	let (input, before_name) = multispace0(input)?;
+	let (input, name) = alphanumeric1(input)?;
+	let (input, after_name) = multispace0(input)?;
+	let name = Token::new(before_name, name, after_name);
+
+	let (input, setter_equals) = opt(tuple((tag("="), multispace0)))(input)?;
+	let setter_equals = setter_equals.map(|t|Token::new_w_after(t.0, t.1));
+
+	let (input, arguments) = opt(delimited(tag("("), separated_list0(tag(","), argument), tag(")")))(input)?;
+
+	let method_type = if setter_equals.is_some() { MethodType::Setter } else if arguments.is_some() {MethodType::Method} else {MethodType::Getter};
+
+	let (input, body) = method_body(input)?;
+
+	Ok((input, Method{ 
+		attributes, 
+		construct,
+		static_keyword, 
+		foreign, 
+		name, 
+		setter_equals,
+		arguments, 
+		method_type, 
+		body }))
+}
+
+pub fn method_body(input: Span) -> ParserResult<MethodBody> {
+	let (input, before_body) = multispace0(input)?;
+	let (input, open) = tag("{")(input)?;
+	let open = Token::new_w_before(before_body, open);
+	let (input, content) = take_until("}")(input)?;
+	let (input, close) = tag("}")(input)?;
+	let (input, after_body) = whitespace0(input)?;
+	let close = Token::new_w_after(close, after_body);
+
+	Ok((input, MethodBody{opening_bracket: open, methods: Vec::new(), closing_bracket: close}))
+}
+
+pub fn argument(input: Span) -> ParserResult<Argument> {
+	let (input, before_name) = multispace0(input)?;
+	let (input, name) = alphanumeric1(input)?;
+	let (input, after_name) = multispace0(input)?;
+	let name = Token::new(before_name, name, after_name);
+
+	let (input, type_hint) = opt(tuple((char(':'), multispace0, alphanumeric1, multispace0)))(input)?;
+	let type_hint = type_hint.map(|t| Token::new(t.1, t.2, t.3));
+
+	Ok((input, Argument{name, type_hint}))
+}
+
 pub fn attribute(input: Span) -> ParserResult<Attribute> {
-	let (input, _) = multispace0(input)?;
+	let (input, before_tag) = multispace0(input)?;
 	let (input, tag_char) = tag("#")(input)?;
-	let (input, _) = multispace0(input)?;
+	let (input, after_tag) = multispace0(input)?;
 	let (input, runtime_specifier) = opt(tag("!"))(input)?;
-	let (input, _) = multispace0(input)?;
+	let (input, before_key) = multispace0(input)?;
 	let (input, key) = alphanumeric1(input)?;
-	let (input, _) = multispace0(input)?;
+	let (input, after_key) = multispace0(input)?;
 	let (input, attribute) = attribute_value(input)?; //todo: parse subattributes
-	let (input, _) = multispace0(input)?;
+	let (input, after_value) = whitespace0(input)?;
 
 	Ok((
 		input,
@@ -206,10 +285,15 @@ pub fn string_expr(input: Span) -> ParserResult<StringExpr> {
 //todo: support string interpolation and multiline strings
 pub fn quote_string(input: Span) -> ParserResult<Span> {
 	let original_input = input;
-	let (input, _) = char('"')(input)?;
-	let (input, string) = escaped(is_not("\""), '\\', one_of("\\\""))(input)?;
-	let (input, _) = char('"')(input)?;
-	let string = original_input.slice(..(string.len() + 2));
+	let (input, start_quotes) = alt((tag("\"\"\""), tag("\"")))(input)?;
+	let multiline = start_quotes.fragment().eq(&"\"\"\"");
+	let (input, string) = if multiline {
+		escaped(take_until("\"\"\""), '\\', one_of("\\\""))(input)?
+	} else {
+		escaped(is_not("\"\n"), '\\', one_of("\\\""))(input)?
+	};
+	let (input, end_quotes) = alt((tag("\"\"\""), tag("\"")))(input)?;
+	let string = original_input.slice(..(string.len() + start_quotes.len() + end_quotes.len()));
 	Ok((input, string))
 }
 

@@ -3,8 +3,12 @@ import "definition" for Str as CoolString
 import "luxe: color" for White as UwU
 import "luxe: anim/sprite" for Sprite
 
+0x666
+"test text"
 
-#doc="cool class, inherits from Test"
+
+#doc= "cool class, inherits from Test"
+#number=9
 class Other is Test{
 	static test{
 		var ba: Test = Test.new()
@@ -30,6 +34,7 @@ class Other is Test{
 	}
 
 	thing{_cool}
+	thing=(v){_cool=v}
 	other{_other}
 
 	static mew{__mew}

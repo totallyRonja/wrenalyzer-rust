@@ -43,7 +43,14 @@ pub struct Class<'a> {
 	pub class_keyword: Token<'a>,
 	pub name: Token<'a>,
 	pub superclass: Option<Token<'a>>,
+	pub body: ClassBody<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassBody<'a> {
+	pub opening_bracket: Token<'a>,
 	pub methods: Vec<Method<'a>>,
+	pub closing_bracket: Token<'a>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +60,30 @@ pub struct Method<'a> {
 	pub static_keyword: Option<Token<'a>>,
 	pub foreign: Option<Token<'a>>,
 	pub name: Token<'a>,
-	pub logic: Vec<Action<'a>>,
+	pub method_type: MethodType,
+	pub setter_equals: Option<Token<'a>>,
+	pub arguments: Option<Vec<Argument<'a>>>,
+	pub body: MethodBody<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Argument<'a> {
+	pub name: Token<'a>,
+	pub type_hint: Option<Token<'a>>
+}
+
+#[derive(Debug, Clone)]
+pub enum MethodType{
+	Setter,
+	Getter,
+	Method
+}
+
+#[derive(Debug, Clone)]
+pub struct MethodBody<'a> {
+	pub opening_bracket: Token<'a>,
+	pub methods: Vec<Action<'a>>,
+	pub closing_bracket: Token<'a>,
 }
 
 #[derive(Clone)]
