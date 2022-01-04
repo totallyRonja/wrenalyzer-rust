@@ -181,7 +181,7 @@ pub fn method_body(input: Span) -> ParserResult<MethodBody> {
 	let (input, after_body) = whitespace0(input)?;
 	let close = Token::new_w_after(close, after_body);
 
-	Ok((input, MethodBody{opening_bracket: open, methods: Vec::new(), closing_bracket: close}))
+	Ok((input, MethodBody{opening_bracket: open, logic: Vec::new(), closing_bracket: close}))
 }
 
 pub fn argument(input: Span) -> ParserResult<Argument> {
@@ -200,28 +200,31 @@ pub fn attribute(input: Span) -> ParserResult<Attribute> {
 	let (input, before_tag) = multispace0(input)?;
 	let (input, tag_char) = tag("#")(input)?;
 	let (input, after_tag) = multispace0(input)?;
-	let (input, runtime_specifier) = opt(tag("!"))(input)?;
-	let (input, before_key) = multispace0(input)?;
+	let tag_char = Token::new(before_tag, tag_char, after_tag);
+	let (input, runtime_specifier) = opt(tuple((tag("!"), multispace0)))(input)?;
+	let runtime_specifier = runtime_specifier.map(|t| Token::new_w_after(t.0, t.1));
 	let (input, key) = alphanumeric1(input)?;
 	let (input, after_key) = multispace0(input)?;
+	let key = Token::new_w_after(key, after_key);
 	let (input, attribute) = attribute_value(input)?; //todo: parse subattributes
-	let (input, after_value) = whitespace0(input)?;
 
 	Ok((
 		input,
 		Attribute {
-			name: key.into(),
-			tag: tag_char.into(),
-			runtime_specifier: runtime_specifier.map(|s| s.into()),
-			value: AttributeValue::Expr(attribute),
+			name: key,
+			tag: tag_char,
+			runtime_specifier,
+			value: attribute,
 		},
 	))
 }
 
-pub fn attribute_value(input: Span) -> ParserResult<Expr> {
+pub fn attribute_value(input: Span) -> ParserResult<AttributeValue> {
 	let (input, _) = char('=')(input)?;
 	let (input, _) = multispace0(input)?;
-	expr(input)
+	let (input, expr) = expr(input)?;
+
+	Ok((input, expr.into()))
 }
 
 pub fn import_variable(input: Span) -> ParserResult<ImportVar> {

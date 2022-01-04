@@ -1,4 +1,4 @@
-use std::fmt::{Debug};
+use std::fmt::{Debug, Display};
 
 use derive_more::From;
 use flatdebug::FlatDebug;
@@ -53,7 +53,7 @@ pub struct ClassBody<'a> {
 	pub closing_bracket: Token<'a>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Method<'a> {
 	pub attributes: Vec<Attribute<'a>>,
 	pub construct: Option<Token<'a>>,
@@ -66,10 +66,50 @@ pub struct Method<'a> {
 	pub body: MethodBody<'a>,
 }
 
-#[derive(Debug, Clone)]
+impl<'a> Debug for Method<'a>{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut signature = String::new();
+		if let Some(field) = &self.construct {
+			signature.push_str(field.text());
+			signature.push_str(" ");
+		}
+		if let Some(field) = &self.static_keyword {
+			signature.push_str(field.text());
+			signature.push_str(" ");
+		}
+		if let Some(field) = &self.foreign {
+			signature.push_str(field.text());
+			signature.push_str(" ");
+		}
+		signature.push_str(self.name.text());
+		if let Some(field) = &self.setter_equals {
+			signature.push_str(field.text());
+		}
+		if let Some(args) = &self.arguments {
+			let formatted = format!("{:?}", args);
+			signature.push_str(&formatted);
+		}
+
+		f.debug_set().entry(&signature)
+			.entry(&self.body)
+			.finish()
+	}
+}
+
+#[derive(Clone)]
 pub struct Argument<'a> {
 	pub name: Token<'a>,
 	pub type_hint: Option<Token<'a>>
+}
+
+impl<'a> Debug for Argument<'a>{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.name)?;
+		if let Some(hint) = &self.type_hint {
+			write!(f, ": {}", hint)?;
+		}
+		Ok(())
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -82,7 +122,7 @@ pub enum MethodType{
 #[derive(Debug, Clone)]
 pub struct MethodBody<'a> {
 	pub opening_bracket: Token<'a>,
-	pub methods: Vec<Action<'a>>,
+	pub logic: Vec<Action<'a>>,
 	pub closing_bracket: Token<'a>,
 }
 
@@ -126,7 +166,7 @@ impl std::fmt::Debug for NumExpr<'_> {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Attribute<'a> {
 	pub tag: Token<'a>,
 	pub runtime_specifier: Option<Token<'a>>,
@@ -134,7 +174,18 @@ pub struct Attribute<'a> {
 	pub value: AttributeValue<'a>,
 }
 
-#[derive(Debug, Clone)]
+impl<'a> Debug for Attribute<'a> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.tag.text())?;
+		if let Some(runtime) = &self.runtime_specifier {
+			write!(f, "{}", runtime.text())?;
+		}
+		write!(f, "{}", self.name.text())?;
+		write!(f, "={:?}", self.value)
+	}
+}
+
+#[derive(FlatDebug, Clone, From)]
 pub enum AttributeValue<'a> {
 	Expr(Expr<'a>),
 	AttributeGroup(Vec<SubAttribute<'a>>),
@@ -206,6 +257,12 @@ impl<'a> Token<'a> {
 }
 
 impl Debug for Token<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.text())
+	}
+}
+
+impl Display for Token<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.text())
 	}
